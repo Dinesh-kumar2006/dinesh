@@ -1,0 +1,1986 @@
+Install once: pip install PyOpenGL PyOpenGL_accelerate pygame. On Windows, if glutInit fails with a freeglut error, put freeglut.dll (64-bit) next to your script.
+
+Each file is separate. Change the sample values at the top of a file if the exam gives different data. I syntax-checked everything and ran the maths, but could not open the windows here, so run each once before the exam.
+
+
+
+Graph display conventions (revised)
+
+For the 2D transformation and clipping programs, the graph now places X-axis tick numbers directly below the horizontal axis and Y-axis tick numbers directly to the left of the vertical axis (rather than at the window corners). Grid lines and tick marks make coordinate reading easier. Transformation programs mark every original and transformed vertex, label each point (A, B, C, etc.), and show its coordinate value so the change can be compared visually.
+
+Topic 1/2 – Translation of a 2D polygon (square, t = 2,2)
+
+File: 01a_translation_square.py
+
+# Translation of a square by (2,2)
+import math
+from OpenGL.GL import *
+from OpenGL.GLU import *
+from OpenGL.GLUT import *
+
+def draw_axes(xmin, xmax, ymin, ymax, step=1, color=(0.12, 0.12, 0.12)):
+    """Draw a light grid and put numeric tick labels directly beside the axes."""
+    glLineWidth(1)
+    glColor3f(0.90, 0.90, 0.90)
+    glBegin(GL_LINES)
+    x = math.ceil(xmin / step) * step
+    while x <= xmax + 1e-9:
+        glVertex2f(x, ymin); glVertex2f(x, ymax); x += step
+    y = math.ceil(ymin / step) * step
+    while y <= ymax + 1e-9:
+        glVertex2f(xmin, y); glVertex2f(xmax, y); y += step
+    glEnd()
+
+    # Main coordinate axes
+    glColor3f(*color); glLineWidth(2)
+    glBegin(GL_LINES)
+    if ymin <= 0 <= ymax:
+        glVertex2f(xmin, 0); glVertex2f(xmax, 0)
+    if xmin <= 0 <= xmax:
+        glVertex2f(0, ymin); glVertex2f(0, ymax)
+    glEnd()
+
+    tick = step * 0.055
+    font = GLUT_BITMAP_8_BY_13
+    # X tick values: immediately below the horizontal axis, centered on each tick.
+    if ymin <= 0 <= ymax:
+        x = math.ceil(xmin / step) * step
+        while x <= xmax + 1e-9:
+            glColor3f(0.12, 0.12, 0.12)
+            glBegin(GL_LINES); glVertex2f(x, -tick); glVertex2f(x, tick); glEnd()
+            label = f'{x:g}'
+            if abs(x) < 1e-9:
+                label = '0'
+            width = len(label) * 8
+            glRasterPos2f(x - (width / 2) * (xmax-xmin)/600, -step*0.29)
+            for ch in label: glutBitmapCharacter(font, ord(ch))
+            x += step
+
+    # Y tick values: immediately left of the vertical axis, right-aligned.
+    if xmin <= 0 <= xmax:
+        y = math.ceil(ymin / step) * step
+        while y <= ymax + 1e-9:
+            glColor3f(0.12, 0.12, 0.12)
+            glBegin(GL_LINES); glVertex2f(-tick, y); glVertex2f(tick, y); glEnd()
+            if abs(y) > 1e-9:
+                label = f'{y:g}'
+                width = len(label) * 8
+                glRasterPos2f(-step*0.18 - width*(xmax-xmin)/600, y - step*0.045)
+                for ch in label: glutBitmapCharacter(font, ord(ch))
+            y += step
+
+
+def plot_points(points, color, names=None, offset=0.18, direction=1):
+    """Plot every vertex as a large dot and label it with its name and coordinates."""
+    glPointSize(10)
+    glColor3f(*color)
+    glBegin(GL_POINTS)
+    for x, y in points:
+        glVertex2f(x, y)
+    glEnd()
+    if names is None:
+        names = [f'P{i+1}' for i in range(len(points))]
+    glColor3f(0.02, 0.02, 0.02)
+    for (x, y), name in zip(points, names):
+        label = f'{name} ({x:g}, {y:g})'
+        # direction=1 places labels upper-right; direction=-1 lower-left.
+        dx = offset if direction == 1 else -offset
+        dy = offset if direction == 1 else -offset
+        glRasterPos2f(x + dx, y + dy)
+        for ch in label:
+            glutBitmapCharacter(GLUT_BITMAP_8_BY_13, ord(ch))
+
+
+pts = [(0, 0), (3, 0), (3, 3), (0, 3)]
+tx, ty = 2, 2
+M = [[1, 0, tx], [0, 1, ty], [0, 0, 1]]
+
+# [x' y' 1]^T = M . [x y 1]^T   (homogeneous coordinates)
+new = [(M[0][0]*x + M[0][1]*y + M[0][2], M[1][0]*x + M[1][1]*y + M[1][2]) for x, y in pts]
+print("Original -> Transformed")
+for p, q in zip(pts, new):
+    print(p, "->", (round(q[0], 3), round(q[1], 3)))
+
+L = math.ceil(max(abs(v) for p in pts + new for v in p)) + 2   # view size
+
+def poly(p, c):
+    glColor3f(*c)
+    glBegin(GL_LINE_LOOP)
+    for x, y in p:
+        glVertex2f(x, y)
+    glEnd()
+
+def display():
+    glClear(GL_COLOR_BUFFER_BIT)
+    draw_axes(-L, L, -L, L, 1)
+    poly(pts, (1, 0, 0))                                   # original = red
+    poly(new, (0, 0, 1))                                   # transformed = blue
+    plot_points(pts, (1, 0, 0), ['A','B','C','D'], offset=0.28, direction=-1)
+    plot_points(new, (0, 0, 1), ["A'","B'","C'","D'"], offset=0.28, direction=1)
+    glFlush()
+
+glutInit()
+glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB)
+glutInitWindowSize(600, 600)
+glutCreateWindow(b"Translation of a square by (2,2)")
+glClearColor(1, 1, 1, 1)
+glLineWidth(2)
+glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluOrtho2D(-L, L, -L, L)
+glMatrixMode(GL_MODELVIEW)
+glutDisplayFunc(display)
+glutMainLoop()
+
+Topic 1 – Rotation of a triangle by 45° (2D transformations on a triangle)
+
+File: 01b_rotation_triangle.py
+
+# Rotation of a triangle by 45 deg CCW about origin
+import math
+from OpenGL.GL import *
+from OpenGL.GLU import *
+from OpenGL.GLUT import *
+
+def draw_axes(xmin, xmax, ymin, ymax, step=1, color=(0.12, 0.12, 0.12)):
+    """Draw a light grid and put numeric tick labels directly beside the axes."""
+    glLineWidth(1)
+    glColor3f(0.90, 0.90, 0.90)
+    glBegin(GL_LINES)
+    x = math.ceil(xmin / step) * step
+    while x <= xmax + 1e-9:
+        glVertex2f(x, ymin); glVertex2f(x, ymax); x += step
+    y = math.ceil(ymin / step) * step
+    while y <= ymax + 1e-9:
+        glVertex2f(xmin, y); glVertex2f(xmax, y); y += step
+    glEnd()
+
+    # Main coordinate axes
+    glColor3f(*color); glLineWidth(2)
+    glBegin(GL_LINES)
+    if ymin <= 0 <= ymax:
+        glVertex2f(xmin, 0); glVertex2f(xmax, 0)
+    if xmin <= 0 <= xmax:
+        glVertex2f(0, ymin); glVertex2f(0, ymax)
+    glEnd()
+
+    tick = step * 0.055
+    font = GLUT_BITMAP_8_BY_13
+    # X tick values: immediately below the horizontal axis, centered on each tick.
+    if ymin <= 0 <= ymax:
+        x = math.ceil(xmin / step) * step
+        while x <= xmax + 1e-9:
+            glColor3f(0.12, 0.12, 0.12)
+            glBegin(GL_LINES); glVertex2f(x, -tick); glVertex2f(x, tick); glEnd()
+            label = f'{x:g}'
+            if abs(x) < 1e-9:
+                label = '0'
+            width = len(label) * 8
+            glRasterPos2f(x - (width / 2) * (xmax-xmin)/600, -step*0.29)
+            for ch in label: glutBitmapCharacter(font, ord(ch))
+            x += step
+
+    # Y tick values: immediately left of the vertical axis, right-aligned.
+    if xmin <= 0 <= xmax:
+        y = math.ceil(ymin / step) * step
+        while y <= ymax + 1e-9:
+            glColor3f(0.12, 0.12, 0.12)
+            glBegin(GL_LINES); glVertex2f(-tick, y); glVertex2f(tick, y); glEnd()
+            if abs(y) > 1e-9:
+                label = f'{y:g}'
+                width = len(label) * 8
+                glRasterPos2f(-step*0.18 - width*(xmax-xmin)/600, y - step*0.045)
+                for ch in label: glutBitmapCharacter(font, ord(ch))
+            y += step
+
+
+def plot_points(points, color, names=None, offset=0.18, direction=1):
+    """Plot every vertex as a large dot and label it with its name and coordinates."""
+    glPointSize(10)
+    glColor3f(*color)
+    glBegin(GL_POINTS)
+    for x, y in points:
+        glVertex2f(x, y)
+    glEnd()
+    if names is None:
+        names = [f'P{i+1}' for i in range(len(points))]
+    glColor3f(0.02, 0.02, 0.02)
+    for (x, y), name in zip(points, names):
+        label = f'{name} ({x:g}, {y:g})'
+        # direction=1 places labels upper-right; direction=-1 lower-left.
+        dx = offset if direction == 1 else -offset
+        dy = offset if direction == 1 else -offset
+        glRasterPos2f(x + dx, y + dy)
+        for ch in label:
+            glutBitmapCharacter(GLUT_BITMAP_8_BY_13, ord(ch))
+
+
+pts = [(0, 0), (2, 2), (4, 2)]
+a = math.radians(45)
+M = [[math.cos(a), -math.sin(a), 0], [math.sin(a), math.cos(a), 0], [0, 0, 1]]
+
+# [x' y' 1]^T = M . [x y 1]^T   (homogeneous coordinates)
+new = [(M[0][0]*x + M[0][1]*y + M[0][2], M[1][0]*x + M[1][1]*y + M[1][2]) for x, y in pts]
+print("Original -> Transformed")
+for p, q in zip(pts, new):
+    print(p, "->", (round(q[0], 3), round(q[1], 3)))
+
+L = math.ceil(max(abs(v) for p in pts + new for v in p)) + 2   # view size
+
+def poly(p, c):
+    glColor3f(*c)
+    glBegin(GL_LINE_LOOP)
+    for x, y in p:
+        glVertex2f(x, y)
+    glEnd()
+
+def display():
+    glClear(GL_COLOR_BUFFER_BIT)
+    draw_axes(-L, L, -L, L, 1)
+    poly(pts, (1, 0, 0))                                   # original = red
+    poly(new, (0, 0, 1))                                   # transformed = blue
+    plot_points(pts, (1, 0, 0), ['A','B','C'], offset=0.28, direction=-1)
+    plot_points(new, (0, 0, 1), ["A'","B'","C'"], offset=0.28, direction=1)
+    glFlush()
+
+glutInit()
+glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB)
+glutInitWindowSize(600, 600)
+glutCreateWindow(b"Rotation of a triangle by 45 deg CCW about origin")
+glClearColor(1, 1, 1, 1)
+glLineWidth(2)
+glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluOrtho2D(-L, L, -L, L)
+glMatrixMode(GL_MODELVIEW)
+glutDisplayFunc(display)
+glutMainLoop()
+
+Topic 2 – Scaling of a 2D polygon (factor 2)
+
+File: 01c_scaling_polygon.py
+
+# Scaling of a polygon by factor 2
+import math
+from OpenGL.GL import *
+from OpenGL.GLU import *
+from OpenGL.GLUT import *
+
+def draw_axes(xmin, xmax, ymin, ymax, step=1, color=(0.12, 0.12, 0.12)):
+    """Draw a light grid and put numeric tick labels directly beside the axes."""
+    glLineWidth(1)
+    glColor3f(0.90, 0.90, 0.90)
+    glBegin(GL_LINES)
+    x = math.ceil(xmin / step) * step
+    while x <= xmax + 1e-9:
+        glVertex2f(x, ymin); glVertex2f(x, ymax); x += step
+    y = math.ceil(ymin / step) * step
+    while y <= ymax + 1e-9:
+        glVertex2f(xmin, y); glVertex2f(xmax, y); y += step
+    glEnd()
+
+    # Main coordinate axes
+    glColor3f(*color); glLineWidth(2)
+    glBegin(GL_LINES)
+    if ymin <= 0 <= ymax:
+        glVertex2f(xmin, 0); glVertex2f(xmax, 0)
+    if xmin <= 0 <= xmax:
+        glVertex2f(0, ymin); glVertex2f(0, ymax)
+    glEnd()
+
+    tick = step * 0.055
+    font = GLUT_BITMAP_8_BY_13
+    # X tick values: immediately below the horizontal axis, centered on each tick.
+    if ymin <= 0 <= ymax:
+        x = math.ceil(xmin / step) * step
+        while x <= xmax + 1e-9:
+            glColor3f(0.12, 0.12, 0.12)
+            glBegin(GL_LINES); glVertex2f(x, -tick); glVertex2f(x, tick); glEnd()
+            label = f'{x:g}'
+            if abs(x) < 1e-9:
+                label = '0'
+            width = len(label) * 8
+            glRasterPos2f(x - (width / 2) * (xmax-xmin)/600, -step*0.29)
+            for ch in label: glutBitmapCharacter(font, ord(ch))
+            x += step
+
+    # Y tick values: immediately left of the vertical axis, right-aligned.
+    if xmin <= 0 <= xmax:
+        y = math.ceil(ymin / step) * step
+        while y <= ymax + 1e-9:
+            glColor3f(0.12, 0.12, 0.12)
+            glBegin(GL_LINES); glVertex2f(-tick, y); glVertex2f(tick, y); glEnd()
+            if abs(y) > 1e-9:
+                label = f'{y:g}'
+                width = len(label) * 8
+                glRasterPos2f(-step*0.18 - width*(xmax-xmin)/600, y - step*0.045)
+                for ch in label: glutBitmapCharacter(font, ord(ch))
+            y += step
+
+
+def plot_points(points, color, names=None, offset=0.18, direction=1):
+    """Plot every vertex as a large dot and label it with its name and coordinates."""
+    glPointSize(10)
+    glColor3f(*color)
+    glBegin(GL_POINTS)
+    for x, y in points:
+        glVertex2f(x, y)
+    glEnd()
+    if names is None:
+        names = [f'P{i+1}' for i in range(len(points))]
+    glColor3f(0.02, 0.02, 0.02)
+    for (x, y), name in zip(points, names):
+        label = f'{name} ({x:g}, {y:g})'
+        # direction=1 places labels upper-right; direction=-1 lower-left.
+        dx = offset if direction == 1 else -offset
+        dy = offset if direction == 1 else -offset
+        glRasterPos2f(x + dx, y + dy)
+        for ch in label:
+            glutBitmapCharacter(GLUT_BITMAP_8_BY_13, ord(ch))
+
+
+pts = [(2, 5), (7, 10), (10, 2)]
+sx, sy = 2, 2
+M = [[sx, 0, 0], [0, sy, 0], [0, 0, 1]]
+
+# [x' y' 1]^T = M . [x y 1]^T   (homogeneous coordinates)
+new = [(M[0][0]*x + M[0][1]*y + M[0][2], M[1][0]*x + M[1][1]*y + M[1][2]) for x, y in pts]
+print("Original -> Transformed")
+for p, q in zip(pts, new):
+    print(p, "->", (round(q[0], 3), round(q[1], 3)))
+
+L = math.ceil(max(abs(v) for p in pts + new for v in p)) + 2   # view size
+
+def poly(p, c):
+    glColor3f(*c)
+    glBegin(GL_LINE_LOOP)
+    for x, y in p:
+        glVertex2f(x, y)
+    glEnd()
+
+def display():
+    glClear(GL_COLOR_BUFFER_BIT)
+    draw_axes(-L, L, -L, L, 2)
+    poly(pts, (1, 0, 0))                                   # original = red
+    poly(new, (0, 0, 1))                                   # transformed = blue
+    plot_points(pts, (1, 0, 0), ['A','B','C'], offset=0.28, direction=-1)
+    plot_points(new, (0, 0, 1), ["A'","B'","C'"], offset=0.28, direction=1)
+    glFlush()
+
+glutInit()
+glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB)
+glutInitWindowSize(600, 600)
+glutCreateWindow(b"Scaling of a polygon by factor 2")
+glClearColor(1, 1, 1, 1)
+glLineWidth(2)
+glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluOrtho2D(-L, L, -L, L)
+glMatrixMode(GL_MODELVIEW)
+glutDisplayFunc(display)
+glutMainLoop()
+
+Topic 3 – Cohen–Sutherland Line Clipping
+
+File: 02_cohen_sutherland.py
+
+# Ex1b - Cohen-Sutherland line clipping
+from OpenGL.GL import *
+from OpenGL.GLU import *
+from OpenGL.GLUT import *
+import math
+
+def draw_axes(xmin, xmax, ymin, ymax, step=1, color=(0.12, 0.12, 0.12)):
+    """Draw a light grid and put numeric tick labels directly beside the axes."""
+    glLineWidth(1)
+    glColor3f(0.90, 0.90, 0.90)
+    glBegin(GL_LINES)
+    x = math.ceil(xmin / step) * step
+    while x <= xmax + 1e-9:
+        glVertex2f(x, ymin); glVertex2f(x, ymax); x += step
+    y = math.ceil(ymin / step) * step
+    while y <= ymax + 1e-9:
+        glVertex2f(xmin, y); glVertex2f(xmax, y); y += step
+    glEnd()
+
+    # Main coordinate axes
+    glColor3f(*color); glLineWidth(2)
+    glBegin(GL_LINES)
+    if ymin <= 0 <= ymax:
+        glVertex2f(xmin, 0); glVertex2f(xmax, 0)
+    if xmin <= 0 <= xmax:
+        glVertex2f(0, ymin); glVertex2f(0, ymax)
+    glEnd()
+
+    tick = step * 0.055
+    font = GLUT_BITMAP_8_BY_13
+    # X tick values: immediately below the horizontal axis, centered on each tick.
+    if ymin <= 0 <= ymax:
+        x = math.ceil(xmin / step) * step
+        while x <= xmax + 1e-9:
+            glColor3f(0.12, 0.12, 0.12)
+            glBegin(GL_LINES); glVertex2f(x, -tick); glVertex2f(x, tick); glEnd()
+            label = f'{x:g}'
+            if abs(x) < 1e-9:
+                label = '0'
+            width = len(label) * 8
+            glRasterPos2f(x - (width / 2) * (xmax-xmin)/600, -step*0.29)
+            for ch in label: glutBitmapCharacter(font, ord(ch))
+            x += step
+
+    # Y tick values: immediately left of the vertical axis, right-aligned.
+    if xmin <= 0 <= xmax:
+        y = math.ceil(ymin / step) * step
+        while y <= ymax + 1e-9:
+            glColor3f(0.12, 0.12, 0.12)
+            glBegin(GL_LINES); glVertex2f(-tick, y); glVertex2f(tick, y); glEnd()
+            if abs(y) > 1e-9:
+                label = f'{y:g}'
+                width = len(label) * 8
+                glRasterPos2f(-step*0.18 - width*(xmax-xmin)/600, y - step*0.045)
+                for ch in label: glutBitmapCharacter(font, ord(ch))
+            y += step
+
+
+def plot_points(points, color, names=None, offset=0.18, direction=1):
+    """Plot every vertex as a large dot and label it with its name and coordinates."""
+    glPointSize(10)
+    glColor3f(*color)
+    glBegin(GL_POINTS)
+    for x, y in points:
+        glVertex2f(x, y)
+    glEnd()
+    if names is None:
+        names = [f'P{i+1}' for i in range(len(points))]
+    glColor3f(0.02, 0.02, 0.02)
+    for (x, y), name in zip(points, names):
+        label = f'{name} ({x:g}, {y:g})'
+        # direction=1 places labels upper-right; direction=-1 lower-left.
+        dx = offset if direction == 1 else -offset
+        dy = offset if direction == 1 else -offset
+        glRasterPos2f(x + dx, y + dy)
+        for ch in label:
+            glutBitmapCharacter(GLUT_BITMAP_8_BY_13, ord(ch))
+
+
+xmin, ymin, xmax, ymax = 100, 100, 400, 300      # clipping window
+X1, Y1, X2, Y2 = 50, 50, 450, 350                # line
+LEFT, RIGHT, BOTTOM, TOP = 1, 2, 4, 8
+
+def code(x, y):
+    c = 0
+    if x < xmin: c |= LEFT
+    elif x > xmax: c |= RIGHT
+    if y < ymin: c |= BOTTOM
+    elif y > ymax: c |= TOP
+    return c
+
+def clip(x1, y1, x2, y2):
+    c1, c2 = code(x1, y1), code(x2, y2)
+    while True:
+        if not (c1 | c2): return (x1, y1, x2, y2)    # both 0000 -> accept
+        if c1 & c2: return None                        # AND != 0  -> reject
+        co = c1 or c2                                  # an endpoint that is outside
+        if co & TOP:      x, y = x1 + (x2-x1)*(ymax-y1)/(y2-y1), ymax
+        elif co & BOTTOM: x, y = x1 + (x2-x1)*(ymin-y1)/(y2-y1), ymin
+        elif co & RIGHT:  x, y = xmax, y1 + (y2-y1)*(xmax-x1)/(x2-x1)
+        else:             x, y = xmin, y1 + (y2-y1)*(xmin-x1)/(x2-x1)
+        if co == c1: x1, y1, c1 = x, y, code(x, y)
+        else:        x2, y2, c2 = x, y, code(x, y)
+
+res = clip(X1, Y1, X2, Y2)
+print("Region codes:", format(code(X1, Y1), '04b'), format(code(X2, Y2), '04b'))
+print("Clipped line:", None if res is None else tuple(round(v, 2) for v in res))
+
+def line(a, b, c, d):
+    glBegin(GL_LINES); glVertex2f(a, b); glVertex2f(c, d); glEnd()
+
+def display():
+    glClear(GL_COLOR_BUFFER_BIT)
+    draw_axes(0, 500, 0, 400, 50)
+    glColor3f(0, 0, 0); glLineWidth(2)
+    glBegin(GL_LINE_LOOP)
+    for p in ((xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax)): glVertex2f(*p)
+    glEnd()
+    glColor3f(1, 0, 0); glLineWidth(1); line(X1, Y1, X2, Y2)      # original (red)
+    if res:
+        glColor3f(0, .7, 0); glLineWidth(4); line(*res)            # clipped (green)
+        plot_points([(res[0], res[1]), (res[2], res[3])], (0, .5, 0), ["C1", "C2"], offset=9, direction=1)
+    plot_points([(X1, Y1), (X2, Y2)], (1, 0, 0), ["P1", "P2"], offset=9, direction=-1)
+    glFlush()
+
+glutInit()
+glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB)
+glutInitWindowSize(750, 600)                      # same 5:4 ratio as ortho area
+glutCreateWindow(b"Cohen-Sutherland Line Clipping")
+glClearColor(1, 1, 1, 1)
+glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluOrtho2D(-35, 500, -35, 400)
+glMatrixMode(GL_MODELVIEW)
+glutDisplayFunc(display)
+glutMainLoop()
+
+Topic 4 – Sutherland–Hodgman Polygon Clipping
+
+File: 03_sutherland_hodgman.py
+
+# Sutherland-Hodgman polygon clipping (rectangular window)
+from OpenGL.GL import *
+from OpenGL.GLU import *
+from OpenGL.GLUT import *
+import math
+
+def draw_axes(xmin, xmax, ymin, ymax, step=1, color=(0.12, 0.12, 0.12)):
+    """Draw a light grid and put numeric tick labels directly beside the axes."""
+    glLineWidth(1)
+    glColor3f(0.90, 0.90, 0.90)
+    glBegin(GL_LINES)
+    x = math.ceil(xmin / step) * step
+    while x <= xmax + 1e-9:
+        glVertex2f(x, ymin); glVertex2f(x, ymax); x += step
+    y = math.ceil(ymin / step) * step
+    while y <= ymax + 1e-9:
+        glVertex2f(xmin, y); glVertex2f(xmax, y); y += step
+    glEnd()
+
+    # Main coordinate axes
+    glColor3f(*color); glLineWidth(2)
+    glBegin(GL_LINES)
+    if ymin <= 0 <= ymax:
+        glVertex2f(xmin, 0); glVertex2f(xmax, 0)
+    if xmin <= 0 <= xmax:
+        glVertex2f(0, ymin); glVertex2f(0, ymax)
+    glEnd()
+
+    tick = step * 0.055
+    font = GLUT_BITMAP_8_BY_13
+    # X tick values: immediately below the horizontal axis, centered on each tick.
+    if ymin <= 0 <= ymax:
+        x = math.ceil(xmin / step) * step
+        while x <= xmax + 1e-9:
+            glColor3f(0.12, 0.12, 0.12)
+            glBegin(GL_LINES); glVertex2f(x, -tick); glVertex2f(x, tick); glEnd()
+            label = f'{x:g}'
+            if abs(x) < 1e-9:
+                label = '0'
+            width = len(label) * 8
+            glRasterPos2f(x - (width / 2) * (xmax-xmin)/600, -step*0.29)
+            for ch in label: glutBitmapCharacter(font, ord(ch))
+            x += step
+
+    # Y tick values: immediately left of the vertical axis, right-aligned.
+    if xmin <= 0 <= xmax:
+        y = math.ceil(ymin / step) * step
+        while y <= ymax + 1e-9:
+            glColor3f(0.12, 0.12, 0.12)
+            glBegin(GL_LINES); glVertex2f(-tick, y); glVertex2f(tick, y); glEnd()
+            if abs(y) > 1e-9:
+                label = f'{y:g}'
+                width = len(label) * 8
+                glRasterPos2f(-step*0.18 - width*(xmax-xmin)/600, y - step*0.045)
+                for ch in label: glutBitmapCharacter(font, ord(ch))
+            y += step
+
+
+def plot_points(points, color, names=None, offset=0.18, direction=1):
+    """Plot every vertex as a large dot and label it with its name and coordinates."""
+    glPointSize(10)
+    glColor3f(*color)
+    glBegin(GL_POINTS)
+    for x, y in points:
+        glVertex2f(x, y)
+    glEnd()
+    if names is None:
+        names = [f'P{i+1}' for i in range(len(points))]
+    glColor3f(0.02, 0.02, 0.02)
+    for (x, y), name in zip(points, names):
+        label = f'{name} ({x:g}, {y:g})'
+        # direction=1 places labels upper-right; direction=-1 lower-left.
+        dx = offset if direction == 1 else -offset
+        dy = offset if direction == 1 else -offset
+        glRasterPos2f(x + dx, y + dy)
+        for ch in label:
+            glutBitmapCharacter(GLUT_BITMAP_8_BY_13, ord(ch))
+
+
+xmin, ymin, xmax, ymax = 100, 100, 300, 300
+poly = [(50, 150), (200, 50), (350, 150), (350, 250), (200, 350), (50, 250)]
+
+def clip_edge(pg, axis, val, keep_ge):
+    """Clip polygon against one boundary: axis 0 = x, 1 = y."""
+    inside = (lambda p: p[axis] >= val) if keep_ge else (lambda p: p[axis] <= val)
+    def cut(p, q):
+        t = (val - p[axis]) / (q[axis] - p[axis])
+        return (p[0] + t*(q[0]-p[0]), p[1] + t*(q[1]-p[1]))
+    out = []
+    for i in range(len(pg)):
+        cur, prev = pg[i], pg[i-1]
+        if inside(cur):
+            if not inside(prev): out.append(cut(prev, cur))   # out -> in : intersection + cur
+            out.append(cur)                                    # in  -> in : cur
+        elif inside(prev):
+            out.append(cut(prev, cur))                         # in  -> out: intersection only
+    return out
+
+res = poly
+for axis, val, ge in ((0, xmin, True), (0, xmax, False), (1, ymin, True), (1, ymax, False)):
+    res = clip_edge(res, axis, val, ge)                        # left, right, bottom, top
+print("Clipped polygon vertices:")
+for p in res: print((round(p[0], 2), round(p[1], 2)))
+
+def draw(pg, mode, c):
+    glColor3f(*c); glBegin(mode)
+    for x, y in pg: glVertex2f(x, y)
+    glEnd()
+
+def display():
+    glClear(GL_COLOR_BUFFER_BIT)
+    draw_axes(0, 500, 0, 400, 50)
+    draw(res, GL_POLYGON, (.6, 1, .6))                         # clipped (filled green)
+    glLineWidth(2)
+    draw([(xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax)], GL_LINE_LOOP, (0, 0, 0))
+    draw(poly, GL_LINE_LOOP, (1, 0, 0))                        # original (red)
+    draw(res, GL_LINE_LOOP, (0, .5, 0))
+    plot_points(poly, (1, 0, 0), [f"P{i+1}" for i in range(len(poly))], offset=10, direction=-1)
+    plot_points(res, (0, .5, 0), [f"C{i+1}" for i in range(len(res))], offset=10, direction=1)
+    glFlush()
+
+glutInit()
+glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB)
+glutInitWindowSize(625, 500)
+glutCreateWindow(b"Sutherland-Hodgman Polygon Clipping")
+glClearColor(1, 1, 1, 1)
+glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluOrtho2D(-35, 500, -35, 400)
+glMatrixMode(GL_MODELVIEW)
+glutDisplayFunc(display)
+glutMainLoop()
+
+Topic 5 – HSV → RGB (S, V as 0–1)
+
+File: 04a_hsv_to_rgb.py
+
+# HSV -> RGB  (H in degrees, S and V as 0-1)
+from OpenGL.GL import *
+from OpenGL.GLUT import *
+
+def hsv2rgb(h, s, v):                       # h: 0-360, s,v: 0-1
+    c = v * s
+    x = c * (1 - abs((h / 60) % 2 - 1))
+    m = v - c
+    r, g, b = [(c, x, 0), (x, c, 0), (0, c, x), (0, x, c), (x, 0, c), (c, 0, x)][int(h // 60) % 6]
+    return r + m, g + m, b + m
+
+h, s, v = map(float, input("H(0-360) S(0-1) V(0-1): ").split())
+r, g, b = hsv2rgb(h, s, v)
+print("RGB =", round(r * 255), round(g * 255), round(b * 255))
+
+def display():
+    glClearColor(r, g, b, 1)
+    glClear(GL_COLOR_BUFFER_BIT)
+    glFlush()
+
+glutInit()
+glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB)
+glutInitWindowSize(500, 500)
+glutCreateWindow(b"HSV to RGB")
+glutDisplayFunc(display)
+glutMainLoop()
+
+Topic 6 – HSV → RGB using percentage values
+
+File: 04b_hsv_to_rgb_percent.py
+
+# HSV -> RGB  (H in degrees, S and V in PERCENT)
+from OpenGL.GL import *
+from OpenGL.GLUT import *
+
+def hsv2rgb(h, s, v):                       # h: 0-360, s,v: 0-1
+    c = v * s
+    x = c * (1 - abs((h / 60) % 2 - 1))
+    m = v - c
+    r, g, b = [(c, x, 0), (x, c, 0), (0, c, x), (0, x, c), (x, 0, c), (c, 0, x)][int(h // 60) % 6]
+    return r + m, g + m, b + m
+
+h, s, v = map(float, input("H(0-360) S(0-100) V(0-100): ").split())
+r, g, b = hsv2rgb(h, s / 100, v / 100)          # percent -> 0-1
+print("RGB =", round(r * 255), round(g * 255), round(b * 255))
+
+def display():
+    glClearColor(r, g, b, 1)
+    glClear(GL_COLOR_BUFFER_BIT)
+    glFlush()
+
+glutInit()
+glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB)
+glutInitWindowSize(500, 500)
+glutCreateWindow(b"HSV to RGB")
+glutDisplayFunc(display)
+glutMainLoop()
+
+Topic 6 – RGB → HSV with colour wheel
+
+File: 04c_rgb_to_hsv_wheel.py
+
+# RGB -> HSV and display on HSV colour wheel
+import math
+from OpenGL.GL import *
+from OpenGL.GLU import *
+from OpenGL.GLUT import *
+
+def draw_axes(xmin, xmax, ymin, ymax, step=1, color=(0.15, 0.15, 0.15)):
+    """Draw grid, axes, tick marks, and numbers immediately beside the axes."""
+    glLineWidth(1)
+    glColor3f(0.90, 0.90, 0.90)
+    glBegin(GL_LINES)
+    x = math.ceil(xmin / step) * step
+    while x <= xmax + 1e-9:
+        glVertex2f(x, ymin); glVertex2f(x, ymax); x += step
+    y = math.ceil(ymin / step) * step
+    while y <= ymax + 1e-9:
+        glVertex2f(xmin, y); glVertex2f(xmax, y); y += step
+    glEnd()
+
+    glColor3f(*color); glLineWidth(2)
+    glBegin(GL_LINES)
+    if ymin <= 0 <= ymax:
+        glVertex2f(xmin, 0); glVertex2f(xmax, 0)
+    if xmin <= 0 <= xmax:
+        glVertex2f(0, ymin); glVertex2f(0, ymax)
+    glEnd()
+
+    tick = step * 0.07
+    # X numbers sit just BELOW the horizontal axis; Y numbers just LEFT of vertical axis.
+    x = math.ceil(xmin / step) * step
+    while x <= xmax + 1e-9:
+        if ymin <= 0 <= ymax:
+            glBegin(GL_LINES); glVertex2f(x, -tick); glVertex2f(x, tick); glEnd()
+            if abs(x) > 1e-9:
+                glRasterPos2f(x - step*0.12, -step*0.34)
+                for ch in f"{x:g}": glutBitmapCharacter(GLUT_BITMAP_8_BY_13, ord(ch))
+        x += step
+    y = math.ceil(ymin / step) * step
+    while y <= ymax + 1e-9:
+        if xmin <= 0 <= xmax:
+            glBegin(GL_LINES); glVertex2f(-tick, y); glVertex2f(tick, y); glEnd()
+            if abs(y) > 1e-9:
+                glRasterPos2f(-step*0.48, y - step*0.06)
+                for ch in f"{y:g}": glutBitmapCharacter(GLUT_BITMAP_8_BY_13, ord(ch))
+        y += step
+    if xmin <= 0 <= xmax and ymin <= 0 <= ymax:
+        glRasterPos2f(step*0.10, -step*0.34)
+        glutBitmapCharacter(GLUT_BITMAP_8_BY_13, ord('0'))
+    # Axis names close to the arrow ends.
+    glRasterPos2f(xmax-step*0.35, step*0.16 if ymin <= 0 <= ymax else ymin+step*0.2)
+    glutBitmapCharacter(GLUT_BITMAP_8_BY_13, ord('X'))
+    glRasterPos2f(step*0.15 if xmin <= 0 <= xmax else xmin+step*0.2, ymax-step*0.25)
+    glutBitmapCharacter(GLUT_BITMAP_8_BY_13, ord('Y'))
+
+
+def plot_points(points, color, names=None, offset=0.18):
+    """Show each vertex as a visible dot and print its name and (x,y) value."""
+    glPointSize(9); glColor3f(*color)
+    glBegin(GL_POINTS)
+    for x, y in points: glVertex2f(x, y)
+    glEnd()
+    if names is None: names = [f'P{i+1}' for i in range(len(points))]
+    glColor3f(0.05, 0.05, 0.05)
+    for (x, y), name in zip(points, names):
+        label = f"{name}({x:g},{y:g})"
+        glRasterPos2f(x + offset, y + offset)
+        for ch in label: glutBitmapCharacter(GLUT_BITMAP_8_BY_13, ord(ch))
+
+
+def hsv2rgb(h, s, v):                       # h: 0-360, s,v: 0-1
+    c = v * s
+    x = c * (1 - abs((h / 60) % 2 - 1))
+    m = v - c
+    r, g, b = [(c, x, 0), (x, c, 0), (0, c, x), (0, x, c), (x, 0, c), (c, 0, x)][int(h // 60) % 6]
+    return r + m, g + m, b + m
+
+def rgb2hsv(r, g, b):                       # r,g,b: 0-1
+    mx, mn = max(r, g, b), min(r, g, b); d = mx - mn
+    if d == 0: h = 0
+    elif mx == r: h = 60 * (((g - b) / d) % 6)
+    elif mx == g: h = 60 * ((b - r) / d + 2)
+    else: h = 60 * ((r - g) / d + 4)
+    return h, (0 if mx == 0 else d / mx), mx
+
+R, G, B = map(int, input("R G B (0-255): ").split())
+h, s, v = rgb2hsv(R / 255, G / 255, B / 255)
+print(f"H = {h:.2f} deg   S = {s*100:.2f} %   V = {v*100:.2f} %")
+
+def display():
+    glClear(GL_COLOR_BUFFER_BIT)
+    draw_axes(-1, 1, -1, 1, 0.5, (1, 1, 1))
+    glBegin(GL_TRIANGLE_FAN)
+    glColor3f(1, 1, 1); glVertex2f(0, 0)                          # centre = white (S=0)
+    for a in range(361):
+        glColor3f(*hsv2rgb(a, 1, 1))
+        glVertex2f(.8 * math.cos(math.radians(a)), .8 * math.sin(math.radians(a)))
+    glEnd()
+    glPointSize(12); glColor3f(0, 0, 0)                           # marker of the given colour
+    glBegin(GL_POINTS)
+    glVertex2f(.8 * s * math.cos(math.radians(h)), .8 * s * math.sin(math.radians(h)))
+    glEnd()
+    plot_points([(.8 * s * math.cos(math.radians(h)), .8 * s * math.sin(math.radians(h)))], (0, 0, 0), ["RGB"], offset=0.05)
+    glFlush()
+
+glutInit()
+glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB)
+glutInitWindowSize(500, 500)
+glutCreateWindow(b"RGB to HSV Colour Wheel")
+glClearColor(0, 0, 0, 1)
+glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluOrtho2D(-1, 1, -1, 1)
+glMatrixMode(GL_MODELVIEW)
+glutDisplayFunc(display)
+glutMainLoop()
+
+Topic 7 – Flat Shading of a 3D Cube
+
+File: 05a_flat_shading_cube.py
+
+# Ex3 - Flat shading of a 3D 3D cube (Lambert: I = max(0, N.L))
+import math
+from OpenGL.GL import *
+from OpenGL.GLU import *
+from OpenGL.GLUT import *
+
+def sub(a, b): return tuple(x - y for x, y in zip(a, b))
+def dot(a, b): return sum(x * y for x, y in zip(a, b))
+def cross(a, b): return (a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0])
+def unit(a):
+    l = math.sqrt(dot(a, a)) or 1
+    return tuple(x / l for x in a)
+
+V = [(0,0,0), (1,0,0), (1,1,0), (0,1,0), (0,0,1), (1,0,1), (1,1,1), (0,1,1)]
+F = [(0,3,2,1), (4,5,6,7), (0,1,5,4), (3,7,6,2), (1,2,6,5), (0,4,7,3)]
+
+C = tuple(sum(c) / len(V) for c in zip(*V))                 # object centre
+N = []                                                      # one outward unit normal per face
+for f in F:
+    n = unit(cross(sub(V[f[1]], V[f[0]]), sub(V[f[2]], V[f[0]])))   # N = A x B
+    fc = tuple(sum(V[i][k] for i in f) / len(f) for k in range(3))
+    if dot(n, sub(fc, C)) < 0: n = tuple(-x for x in n)              # make it point outward
+    N.append(n)
+
+BASE, AMB = (1.0, 0.5, 0.0), 0.15          # same colour for all faces; AMB=0 -> pure Lambert
+LIGHT, K = unit((1, 1, 1)), unit((1, 1, 0))
+angle = 0
+
+def rot(v, deg):                           # rotate normal about axis K (Rodrigues) like glRotatef
+    t = math.radians(deg); c, s = math.cos(t), math.sin(t)
+    kv, d = cross(K, v), dot(K, v) * (1 - c)
+    return tuple(v[i]*c + kv[i]*s + K[i]*d for i in range(3))
+
+def display():
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+    glLoadIdentity()
+    gluLookAt(3, 3, 4, 0, 0, 0, 0, 1, 0)
+    glRotatef(angle, 1, 1, 0)
+    glTranslatef(*[-c for c in C])         # centre the object, then spin about its centre
+    for f, n in zip(F, N):
+        i = max(0.0, dot(rot(n, angle), LIGHT))
+        i = AMB + (1 - AMB) * i
+        glColor3f(*[c * i for c in BASE])  # ONE colour for the whole face = flat shading
+        glBegin(GL_POLYGON)
+        for k in f: glVertex3fv(V[k])
+        glEnd()
+    glutSwapBuffers()
+
+def update(_):
+    global angle
+    angle = (angle + 1) % 360
+    glutPostRedisplay()
+    glutTimerFunc(16, update, 0)
+
+def reshape(w, h):
+    glViewport(0, 0, w, max(h, 1))
+    glMatrixMode(GL_PROJECTION); glLoadIdentity()
+    gluPerspective(45, w / float(max(h, 1)), .1, 100)
+    glMatrixMode(GL_MODELVIEW)
+
+glutInit()
+glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH)
+glutInitWindowSize(800, 600)
+glutCreateWindow(b"Flat Shading - Cube")
+glClearColor(.05, .05, .05, 1)
+glEnable(GL_DEPTH_TEST); glShadeModel(GL_FLAT)
+glutDisplayFunc(display); glutReshapeFunc(reshape); glutTimerFunc(0, update, 0)
+glutMainLoop()
+
+Topic 8 – Flat Shading of a 3D Pyramid
+
+File: 05b_flat_shading_pyramid.py
+
+# Ex3 - Flat shading of a 3D 3D pyramid (Lambert: I = max(0, N.L))
+import math
+from OpenGL.GL import *
+from OpenGL.GLU import *
+from OpenGL.GLUT import *
+
+def sub(a, b): return tuple(x - y for x, y in zip(a, b))
+def dot(a, b): return sum(x * y for x, y in zip(a, b))
+def cross(a, b): return (a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0])
+def unit(a):
+    l = math.sqrt(dot(a, a)) or 1
+    return tuple(x / l for x in a)
+
+V = [(0,0,0), (1,0,0), (1,0,1), (0,0,1), (.5,1,.5)]       # base 0-3, apex 4
+F = [(0,1,2,3), (0,1,4), (1,2,4), (2,3,4), (3,0,4)]
+
+C = tuple(sum(c) / len(V) for c in zip(*V))                 # object centre
+N = []                                                      # one outward unit normal per face
+for f in F:
+    n = unit(cross(sub(V[f[1]], V[f[0]]), sub(V[f[2]], V[f[0]])))   # N = A x B
+    fc = tuple(sum(V[i][k] for i in f) / len(f) for k in range(3))
+    if dot(n, sub(fc, C)) < 0: n = tuple(-x for x in n)              # make it point outward
+    N.append(n)
+
+BASE, AMB = (1.0, 0.5, 0.0), 0.15          # same colour for all faces; AMB=0 -> pure Lambert
+LIGHT, K = unit((1, 1, 1)), unit((1, 1, 0))
+angle = 0
+
+def rot(v, deg):                           # rotate normal about axis K (Rodrigues) like glRotatef
+    t = math.radians(deg); c, s = math.cos(t), math.sin(t)
+    kv, d = cross(K, v), dot(K, v) * (1 - c)
+    return tuple(v[i]*c + kv[i]*s + K[i]*d for i in range(3))
+
+def display():
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+    glLoadIdentity()
+    gluLookAt(3, 3, 4, 0, 0, 0, 0, 1, 0)
+    glRotatef(angle, 1, 1, 0)
+    glTranslatef(*[-c for c in C])         # centre the object, then spin about its centre
+    for f, n in zip(F, N):
+        i = max(0.0, dot(rot(n, angle), LIGHT))
+        i = AMB + (1 - AMB) * i
+        glColor3f(*[c * i for c in BASE])  # ONE colour for the whole face = flat shading
+        glBegin(GL_POLYGON)
+        for k in f: glVertex3fv(V[k])
+        glEnd()
+    glutSwapBuffers()
+
+def update(_):
+    global angle
+    angle = (angle + 1) % 360
+    glutPostRedisplay()
+    glutTimerFunc(16, update, 0)
+
+def reshape(w, h):
+    glViewport(0, 0, w, max(h, 1))
+    glMatrixMode(GL_PROJECTION); glLoadIdentity()
+    gluPerspective(45, w / float(max(h, 1)), .1, 100)
+    glMatrixMode(GL_MODELVIEW)
+
+glutInit()
+glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH)
+glutInitWindowSize(800, 600)
+glutCreateWindow(b"Flat Shading - Pyramid")
+glClearColor(.05, .05, .05, 1)
+glEnable(GL_DEPTH_TEST); glShadeModel(GL_FLAT)
+glutDisplayFunc(display); glutReshapeFunc(reshape); glutTimerFunc(0, update, 0)
+glutMainLoop()
+
+Topic 9 – 3D Modelling using a Scene Graph (Car)
+
+File: 09_scene_graph_car.py
+
+# Ex4 - Scene graph (Group / Object / Camera nodes) : car  -  pygame + PyOpenGL
+import pygame
+from pygame.locals import *
+from OpenGL.GL import *
+from OpenGL.GLU import *
+
+class Node:                                   # base node: local transform + children
+    def __init__(s, name, pos=(0, 0, 0), scale=(1, 1, 1), angle=0, axis=(0, 1, 0)):
+        s.name, s.pos, s.scale, s.angle, s.axis, s.children = name, pos, scale, angle, axis, []
+    def add(s, *kids): s.children += kids; return s
+    def render(s): pass
+    def draw(s):
+        glPushMatrix()
+        glTranslatef(*s.pos); glRotatef(s.angle, *s.axis); glScalef(*s.scale)
+        s.render()
+        for c in s.children: c.draw()
+        glPopMatrix()
+    def tree(s, d=0):
+        print("  " * d + "- " + s.name)
+        for c in s.children: c.tree(d + 1)
+
+class GroupNode(Node): pass                   # only groups children (transform inherited)
+
+class ObjectNode(Node):                       # draws a shape
+    def __init__(s, name, shape, color, **kw):
+        super().__init__(name, **kw); s.shape, s.color = shape, color
+    def render(s): glColor3f(*s.color); s.shape()
+
+class CameraNode(Node):                       # sets the view (no push/pop)
+    def __init__(s, eye):
+        super().__init__("Camera"); s.eye = eye
+    def draw(s):
+        glLoadIdentity(); gluLookAt(*s.eye, 0, 0, 0, 0, 1, 0)
+        glLightfv(GL_LIGHT0, GL_POSITION, (5, 10, 8, 1))
+
+CV = [(-1,-1,1), (1,-1,1), (1,1,1), (-1,1,1), (-1,-1,-1), (1,-1,-1), (1,1,-1), (-1,1,-1)]
+CF = [((0,1,2,3), (0,0,1)), ((1,5,6,2), (1,0,0)), ((5,4,7,6), (0,0,-1)),
+      ((4,0,3,7), (-1,0,0)), ((3,2,6,7), (0,1,0)), ((4,5,1,0), (0,-1,0))]
+def cube():
+    glBegin(GL_QUADS)
+    for f, n in CF:
+        glNormal3f(*n)
+        for k in f: glVertex3fv(CV[k])
+    glEnd()
+
+Q = None
+def wheel():                                   # axle along z
+    glTranslatef(0, 0, -.15)
+    gluCylinder(Q, .5, .5, .3, 20, 1); gluDisk(Q, 0, .5, 20, 1)
+    glTranslatef(0, 0, .3); gluDisk(Q, 0, .5, 20, 1)
+    glColor3f(.9, .9, .9)                      # marker bar so the spin is visible
+    for z in (.02, -.32):
+        glPushMatrix(); glTranslatef(.25, 0, z); glScalef(.25, .06, .02); cube(); glPopMatrix()
+
+def create_car():
+    car = GroupNode("Car")
+    wheels = [ObjectNode(f"Wheel_{n}", wheel, (.1, .1, .1), pos=(x, -.6, z), axis=(0, 0, 1))
+              for n, x, z in (("FL", 1.5, 1.05), ("FR", 1.5, -1.05), ("RL", -1.5, 1.05), ("RR", -1.5, -1.05))]
+    car.add(ObjectNode("Body", cube, (.8, .1, .1), scale=(2.5, .6, 1)),
+            ObjectNode("Roof", cube, (.6, .05, .05), pos=(-.2, .9, 0), scale=(1.4, .5, .8)),
+            ObjectNode("Window_L", cube, (.5, .8, 1), pos=(-.2, .9, .82), scale=(1.1, .3, .08)),
+            ObjectNode("Window_R", cube, (.5, .8, 1), pos=(-.2, .9, -.82), scale=(1.1, .3, .08)),
+            *wheels)
+    return car, wheels
+
+def main():
+    global Q
+    pygame.init()
+    pygame.display.set_mode((800, 600), DOUBLEBUF | OPENGL)
+    pygame.display.set_caption("Scene Graph - Car")
+    Q = gluNewQuadric()
+    glMatrixMode(GL_PROJECTION); gluPerspective(45, 800 / 600, .1, 100); glMatrixMode(GL_MODELVIEW)
+    for cap in (GL_DEPTH_TEST, GL_LIGHTING, GL_LIGHT0, GL_COLOR_MATERIAL, GL_NORMALIZE): glEnable(cap)
+    glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, GL_TRUE)
+    glClearColor(.6, .8, 1, 1)
+
+    car, wheels = create_car()
+    root = GroupNode("Root").add(CameraNode((6, 4, 10)), car)
+    root.tree()                                           # prints the scene graph
+
+    clock, running = pygame.time.Clock(), True
+    while running:
+        for e in pygame.event.get():
+            if e.type == QUIT: running = False
+        car.angle += .5                                   # whole-car rotation (Group node)
+        for w in wheels: w.angle -= 4                     # wheel-only rotation (Object nodes)
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        root.draw()
+        pygame.display.flip(); clock.tick(60)
+    pygame.quit()
+
+main()
+
+Topic 10 – 3D Articulated Bicycle with Animation
+
+File: 10_bicycle_3d.py
+
+# Ex5-II - 3D articulated bicycle (hierarchical transforms)   keys: r = wheels, p = pedals, ESC = quit
+import math
+from OpenGL.GL import *
+from OpenGL.GLU import *
+from OpenGL.GLUT import *
+
+wheel_ang = pedal_ang = 0
+wheels_on = pedals_on = True
+Q = None
+R, F, BB, S, H = (-1, 0), (1, 0), (-.1, 0), (-.4, .8), (.75, .8)   # rear hub, front hub, crank, seat top, head top
+
+def tube(p1, p2, r=.03, z=0):                 # cylinder between two points in the XY plane
+    dx, dy = p2[0] - p1[0], p2[1] - p1[1]
+    glPushMatrix()
+    glTranslatef(p1[0], p1[1], z)
+    glRotatef(math.degrees(math.atan2(dy, dx)), 0, 0, 1)
+    glRotatef(90, 0, 1, 0)                    # cylinder axis z -> x
+    gluCylinder(Q, r, r, math.hypot(dx, dy), 12, 1)
+    glPopMatrix()
+
+def wheel():                                  # torus lies in XY plane, axle = z
+    glColor3f(.1, .1, .1); glutSolidTorus(.03, .35, 12, 36)
+    glDisable(GL_LIGHTING); glColor3f(.7, .7, .7)
+    glBegin(GL_LINES)
+    for a in range(0, 360, 30):
+        glVertex2f(0, 0); glVertex2f(.35 * math.cos(math.radians(a)), .35 * math.sin(math.radians(a)))
+    glEnd(); glEnable(GL_LIGHTING)
+
+def bike():
+    for hub in (R, F):                        # wheels spin about their own axle
+        glPushMatrix(); glTranslatef(hub[0], hub[1], 0); glRotatef(-wheel_ang, 0, 0, 1); wheel(); glPopMatrix()
+    glColor3f(0, .2, 1)                       # frame
+    for z in (.07, -.07): tube(R, BB, z=z); tube(R, S, z=z)
+    tube(BB, S); tube(S, H); tube(BB, H)
+    glColor3f(1, .9, 0)                       # fork
+    for z in (.07, -.07): tube(H, F, z=z)
+    glColor3f(0, .6, 0)                       # stem + handlebar
+    tube(H, (H[0] + .05, H[1] + .12))
+    glPushMatrix(); glTranslatef(H[0] + .05, H[1] + .12, -.25); gluCylinder(Q, .02, .02, .5, 10, 1); glPopMatrix()
+    glColor3f(.8, 0, 0)                       # seat post + seat
+    tube(S, (S[0] - .02, S[1] + .15))
+    glPushMatrix(); glTranslatef(S[0] - .02, S[1] + .18, 0); glScalef(.3, .06, .15); glutSolidCube(1); glPopMatrix()
+    glPushMatrix()                            # crank + pedals (pedals stay level)
+    glTranslatef(BB[0], BB[1], 0); glRotatef(-pedal_ang, 0, 0, 1)
+    for s in (1, -1):
+        glColor3f(.5, .5, .5); tube((0, 0), (.18 * s, 0), .015, .1 * s)
+        glPushMatrix(); glTranslatef(.18 * s, 0, .14 * s); glRotatef(pedal_ang, 0, 0, 1)
+        glColor3f(.1, .1, .1); glScalef(.12, .02, .07); glutSolidCube(1); glPopMatrix()
+    glPopMatrix()
+
+def display():
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+    glLoadIdentity()
+    gluLookAt(2.5, 1.5, 4, 0, .35, 0, 0, 1, 0)
+    glLightfv(GL_LIGHT0, GL_POSITION, (3, 5, 5, 1))
+    bike()
+    glutSwapBuffers()
+
+def update(_):
+    global wheel_ang, pedal_ang
+    if wheels_on: wheel_ang = (wheel_ang + 4) % 360
+    if pedals_on: pedal_ang = (pedal_ang + 6) % 360
+    glutPostRedisplay(); glutTimerFunc(30, update, 0)
+
+def keys(k, x, y):
+    global wheels_on, pedals_on
+    if k == b'r': wheels_on = not wheels_on
+    elif k == b'p': pedals_on = not pedals_on
+    elif k == b'\x1b': raise SystemExit
+
+def reshape(w, h):
+    glViewport(0, 0, w, max(h, 1))
+    glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(45, w / float(max(h, 1)), .1, 100)
+    glMatrixMode(GL_MODELVIEW)
+
+glutInit()
+glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH)
+glutInitWindowSize(800, 600)
+glutCreateWindow(b"3D Articulated Bicycle")
+Q = gluNewQuadric()
+glClearColor(1, 1, 1, 1)
+for cap in (GL_DEPTH_TEST, GL_LIGHTING, GL_LIGHT0, GL_COLOR_MATERIAL, GL_NORMALIZE): glEnable(cap)
+glutDisplayFunc(display); glutReshapeFunc(reshape); glutKeyboardFunc(keys); glutTimerFunc(30, update, 0)
+glutMainLoop()
+
+Topic 11 – 2D Articulated Human Skeleton Animation
+
+File: 11_human_2d.py
+
+# Ex5-I - 2D articulated human skeleton with walking animation
+import math
+from OpenGL.GL import *
+from OpenGL.GLU import *
+from OpenGL.GLUT import *
+
+def draw_axes(xmin, xmax, ymin, ymax, step=1, color=(0.15, 0.15, 0.15)):
+    """Draw grid, axes, tick marks, and numbers immediately beside the axes."""
+    glLineWidth(1)
+    glColor3f(0.90, 0.90, 0.90)
+    glBegin(GL_LINES)
+    x = math.ceil(xmin / step) * step
+    while x <= xmax + 1e-9:
+        glVertex2f(x, ymin); glVertex2f(x, ymax); x += step
+    y = math.ceil(ymin / step) * step
+    while y <= ymax + 1e-9:
+        glVertex2f(xmin, y); glVertex2f(xmax, y); y += step
+    glEnd()
+
+    glColor3f(*color); glLineWidth(2)
+    glBegin(GL_LINES)
+    if ymin <= 0 <= ymax:
+        glVertex2f(xmin, 0); glVertex2f(xmax, 0)
+    if xmin <= 0 <= xmax:
+        glVertex2f(0, ymin); glVertex2f(0, ymax)
+    glEnd()
+
+    tick = step * 0.07
+    # X numbers sit just BELOW the horizontal axis; Y numbers just LEFT of vertical axis.
+    x = math.ceil(xmin / step) * step
+    while x <= xmax + 1e-9:
+        if ymin <= 0 <= ymax:
+            glBegin(GL_LINES); glVertex2f(x, -tick); glVertex2f(x, tick); glEnd()
+            if abs(x) > 1e-9:
+                glRasterPos2f(x - step*0.12, -step*0.34)
+                for ch in f"{x:g}": glutBitmapCharacter(GLUT_BITMAP_8_BY_13, ord(ch))
+        x += step
+    y = math.ceil(ymin / step) * step
+    while y <= ymax + 1e-9:
+        if xmin <= 0 <= xmax:
+            glBegin(GL_LINES); glVertex2f(-tick, y); glVertex2f(tick, y); glEnd()
+            if abs(y) > 1e-9:
+                glRasterPos2f(-step*0.48, y - step*0.06)
+                for ch in f"{y:g}": glutBitmapCharacter(GLUT_BITMAP_8_BY_13, ord(ch))
+        y += step
+    if xmin <= 0 <= xmax and ymin <= 0 <= ymax:
+        glRasterPos2f(step*0.10, -step*0.34)
+        glutBitmapCharacter(GLUT_BITMAP_8_BY_13, ord('0'))
+    # Axis names close to the arrow ends.
+    glRasterPos2f(xmax-step*0.35, step*0.16 if ymin <= 0 <= ymax else ymin+step*0.2)
+    glutBitmapCharacter(GLUT_BITMAP_8_BY_13, ord('X'))
+    glRasterPos2f(step*0.15 if xmin <= 0 <= xmax else xmin+step*0.2, ymax-step*0.25)
+    glutBitmapCharacter(GLUT_BITMAP_8_BY_13, ord('Y'))
+
+
+def plot_points(points, color, names=None, offset=0.18):
+    """Show each vertex as a visible dot and print its name and (x,y) value."""
+    glPointSize(9); glColor3f(*color)
+    glBegin(GL_POINTS)
+    for x, y in points: glVertex2f(x, y)
+    glEnd()
+    if names is None: names = [f'P{i+1}' for i in range(len(points))]
+    glColor3f(0.05, 0.05, 0.05)
+    for (x, y), name in zip(points, names):
+        label = f"{name}({x:g},{y:g})"
+        glRasterPos2f(x + offset, y + offset)
+        for ch in label: glutBitmapCharacter(GLUT_BITMAP_8_BY_13, ord(ch))
+
+
+t = 0.0
+
+def circle(r, col):
+    glColor3f(*col); glBegin(GL_POLYGON)
+    for i in range(0, 360, 10): glVertex2f(r * math.cos(math.radians(i)), r * math.sin(math.radians(i)))
+    glEnd()
+
+def seg(w, h, col):                            # rectangle hanging DOWN from the pivot (0,0)
+    glColor3f(*col); glBegin(GL_QUADS)
+    glVertex2f(-w/2, 0); glVertex2f(w/2, 0); glVertex2f(w/2, -h); glVertex2f(-w/2, -h)
+    glEnd()
+
+def limb(l1, l2, w, a1, a2, c1, c2):           # a1 = shoulder/hip angle, a2 = elbow/knee angle
+    glPushMatrix()
+    glRotatef(a1, 0, 0, 1); seg(w, l1, c1)
+    glTranslatef(0, -l1, 0)                    # move to child joint (hierarchy)
+    glRotatef(a2, 0, 0, 1); seg(w * .85, l2, c2)
+    glTranslatef(0, -l2, 0); circle(.06, (1, .75, .55))        # hand / foot
+    glPopMatrix()
+    glPushMatrix(); circle(.045, (1, .9, 0)); glPopMatrix()    # joint dot at pivot
+
+def at(x, y):                                  # push + translate helper
+    glPushMatrix(); glTranslatef(x, y, 0)
+
+def display():
+    glClear(GL_COLOR_BUFFER_BIT)
+    draw_axes(-2, 2, -2, 2, 0.5)
+    glLoadIdentity()
+    sw = 30 * math.sin(t)                      # swing angle
+    at(0, .45); seg(.45, .9, (.2, .5, 1)); glPopMatrix()              # torso
+    at(0, .7);  circle(.22, (1, .75, .55)); glPopMatrix()             # head
+    elbow = 25 + 15 * math.sin(t)
+    at(-.225, .4); limb(.45, .4, .12, -sw, elbow, (1, .3, .3), (.3, .75, .3)); glPopMatrix()   # left arm
+    at(.225, .4);  limb(.45, .4, .12,  sw, elbow, (1, .3, .3), (.3, .75, .3)); glPopMatrix()   # right arm
+    at(-.12, -.45); limb(.55, .5, .15,  sw, -40 * max(0, -math.cos(t)), (.55, .2, .9), (1, .55, 0)); glPopMatrix()  # left leg
+    at(.12, -.45);  limb(.55, .5, .15, -sw, -40 * max(0,  math.cos(t)), (.55, .2, .9), (1, .55, 0)); glPopMatrix()  # right leg
+    glutSwapBuffers()
+
+def update(_):
+    global t
+    t += .08
+    glutPostRedisplay(); glutTimerFunc(30, update, 0)
+
+glutInit()
+glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB)
+glutInitWindowSize(600, 600)
+glutCreateWindow(b"2D Articulated Human")
+glClearColor(1, 1, 1, 1)
+glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluOrtho2D(-2, 2, -2, 2)
+glMatrixMode(GL_MODELVIEW)
+glutDisplayFunc(display); glutTimerFunc(30, update, 0)
+glutMainLoop()
+
+Manual Calculation (30 marks) – worked answers
+
+1. Translation – square A(0,0) B(3,0) C(3,3) D(0,3), t=(2,2): x'=x+2, y'=y+2
+→ A'(2,2) B'(5,2) C'(5,5) D'(2,5)
+
+2. Rotation 45° CCW about origin – x' = x cosθ − y sinθ, y' = x sinθ + y cosθ (cos45 = sin45 = 1/√2)
+A(0,0)→A'(0,0); B(2,2)→B'(0, 2√2) ≈ (0, 2.83); C(4,2)→C'(√2, 3√2) ≈ (1.41, 4.24)
+Matrix form: R·[0 2 4; 0 2 2; 1 1 1]
+
+3. Scaling ×2 – A(2,5) B(7,10) C(10,2) → A'(4,10) B'(14,20) C'(20,4)
+
+4. Cohen–Sutherland – window (100,100)–(400,300), line P1(50,50) P2(450,350). Code bits = TOP BOTTOM RIGHT LEFT
+
+P1: x<xmin, y<ymin → 0101; P2: x>xmax, y>ymax → 1010; AND = 0000 → not trivially rejected, clip.
+
+P1 (BOTTOM): y=100, x = 50 + (450−50)(100−50)/(350−50) = 116.67 → (116.67, 100)
+
+P2 (TOP): y=300, x = 50 + 400(300−50)/300 = 383.33 → (383.33, 300)
+
+Both codes 0000 → accept: (116.67,100) – (383.33,300)  (slope 0.75 check ✔)
+
+5. Sutherland–Hodgman – window (100,100)–(300,300), hexagon (50,150)(200,50)(350,150)(350,250)(200,350)(50,250)
+Clipped result (8 vertices): (100,116.67) (125,100) (275,100) (300,116.67) (300,283.33) (275,300) (125,300) (100,283.33)
+
+6. HSV → RGB (C = V·S, X = C(1 − |(H/60) mod 2 − 1|), m = V − C; sector = ⌊H/60⌋ gives (R,G,B)=(C,X,0),(X,C,0),(0,C,X),(0,X,C),(X,0,C),(C,0,X); add m)
+
+(120°, 100%, 100%): C=1, X=0, m=0, sector 2 → (0,1,0) = (0,255,0) green
+
+(210°, 50%, 80%): C=0.4, X=0.2, m=0.4, sector 3 → (0,0.2,0.4)+0.4 = (0.4,0.6,0.8) = (102,153,204)
+
+7. RGB → HSV (Δ = max − min; V = max; S = Δ/max; H = 60·((G−B)/Δ mod 6) if R max, 60·((B−R)/Δ+2) if G max, 60·((R−G)/Δ+4) if B max)
+
+(255,0,255): V=100%, S=100%, R is max → H = 60·(−1 mod 6) = 300°
+
+(51,102,153): max=B=0.6, Δ=0.4 → H = 60·((0.2−0.4)/0.4+4) = 210°, S = 66.7%, V = 60%
+
+8. Flat shading – N = (v2−v1)×(v3−v1) (normalise, outward), I = max(0, N·L), L = (1,1,1)/√3 = (0.577,0.577,0.577), colour = base × I
+
+Cube top N=(0,1,0): I = 0.577; right N=(1,0,0): I = 0.577; front N=(0,0,−1): I = −0.577 → 0 (dark)
+
+With base (1,0.5,0): top/right face = (0.577, 0.289, 0)
+
+Pyramid face (1,2,apex): A=(0,0,1), B=(−0.5,1,0.5) → A×B=(−1,−0.5,0) → flip outward (1,0.5,0) → unit (0.894,0.447,0) → I = 0.894·0.577+0.447·0.577 = 0.774; base face N=(0,−1,0) → I = 0
+
+Transformation order rule (scene graph / articulated models): glTranslate(joint) → glRotate(angle) → draw segment → glTranslate(segment length) → child. Parent transforms are inherited by children; wrap each branch in glPushMatrix()/glPopMatrix().
+
+
+
+
+
+security laboratory
+
+Security Laboratory – All Programs
+CaesarCipher.java
+class caesarCipher {
+    public static String encode(String enc, int offset) {
+        offset = offset % 26 + 26;
+        StringBuilder encoded = new StringBuilder();
+        for (char i : enc.toCharArray()) {
+            if (Character.isLetter(i)) {
+                if (Character.isUpperCase(i)) {
+                    encoded.append((char) ('A' + (i - 'A' + offset) % 26));
+                } else {
+                    encoded.append((char) ('a' + (i - 'a' + offset) % 26));
+                }
+            } else {
+                encoded.append(i);
+            }
+        }
+        return encoded.toString();
+    }
+
+    public static String decode(String enc, int offset) {
+        return encode(enc, 26 - offset);
+    }
+
+    public static void main(String[] args) throws java.lang.Exception {
+        String msg = "Anna University";
+        System.out.println("Simulating Caesar Cipher\n------------------------");
+        System.out.println("Input : " + msg);
+        System.out.printf("Encrypted Message : ");
+        System.out.println(caesarCipher.encode(msg, 3));
+        System.out.printf("Decrypted Message : ");
+        System.out.println(caesarCipher.decode(caesarCipher.encode(msg, 3), 3));
+    }
+}
+playfairCipher.java
+import java.awt.Point;
+
+class playfairCipher {
+    private static char[][] charTable;
+    private static Point[] positions;
+
+    private static String prepareText(String s, boolean chgJtoI) {
+        s = s.toUpperCase().replaceAll("[^A-Z]", "");
+        return chgJtoI ? s.replace("J", "I") : s.replace("Q", "");
+    }
+
+    private static void createTbl(String key, boolean chgJtoI) {
+        charTable = new char[5][5];
+        positions = new Point[26];
+        String s = prepareText(key + "ABCDEFGHIJKLMNOPQRSTUVWXYZ", chgJtoI);
+        int len = s.length();
+        for (int i = 0, k = 0; i < len; i++) {
+            char c = s.charAt(i);
+            if (positions[c - 'A'] == null) {
+                charTable[k / 5][k % 5] = c;
+                positions[c - 'A'] = new Point(k % 5, k / 5);
+                k++;
+            }
+        }
+    }
+
+    private static String codec(StringBuilder txt, int dir) {
+        int len = txt.length();
+        for (int i = 0; i < len; i += 2) {
+            char a = txt.charAt(i);
+            char b = txt.charAt(i + 1);
+            int row1 = positions[a - 'A'].y;
+            int row2 = positions[b - 'A'].y;
+            int col1 = positions[a - 'A'].x;
+            int col2 = positions[b - 'A'].x;
+            if (row1 == row2) {
+                col1 = (col1 + dir) % 5;
+                col2 = (col2 + dir) % 5;
+            } else if (col1 == col2) {
+                row1 = (row1 + dir) % 5;
+                row2 = (row2 + dir) % 5;
+            } else {
+                int tmp = col1;
+                col1 = col2;
+                col2 = tmp;
+            }
+            txt.setCharAt(i, charTable[row1][col1]);
+            txt.setCharAt(i + 1, charTable[row2][col2]);
+        }
+        return txt.toString();
+    }
+
+    private static String encode(String s) {
+        StringBuilder sb = new StringBuilder(s);
+        for (int i = 0; i < sb.length(); i += 2) {
+            if (i == sb.length() - 1) {
+                sb.append(sb.length() % 2 == 1 ? 'X' : "");
+            } else if (sb.charAt(i) == sb.charAt(i + 1)) {
+                sb.insert(i + 1, 'X');
+            }
+        }
+        return codec(sb, 1);
+    }
+
+    private static String decode(String s) {
+        return codec(new StringBuilder(s), 4);
+    }
+
+    public static void main(String[] args) throws java.lang.Exception {
+        String key = "CSE";
+        String txt = "Security Lab";
+        boolean chgJtoI = true;
+        createTbl(key, chgJtoI);
+        String enc = encode(prepareText(txt, chgJtoI));
+        System.out.println("Simulating Playfair Cipher\n----------------------");
+        System.out.println("Input Message : " + txt);
+        System.out.println("Encrypted Message : " + enc);
+        System.out.println("Decrypted Message : " + decode(enc));
+    }
+}
+HillCipher.java
+class hillCipher {
+    public static int[][] keymat = new int[][] { { 1, 2, 1 }, { 2, 3, 2 }, { 2, 2, 1 } };
+    public static int[][] invkeymat = new int[][] { { -1, 0, 1 }, { 2, -1, 0 }, { -2, 2, -1 } };
+    public static String key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+    private static String encode(char a, char b, char c) {
+        int x, y, z;
+        int posa = (int) a - 65;
+        int posb = (int) b - 65;
+        int posc = (int) c - 65;
+        x = posa * keymat[0][0] + posb * keymat[1][0] + posc * keymat[2][0];
+        y = posa * keymat[0][1] + posb * keymat[1][1] + posc * keymat[2][1];
+        z = posa * keymat[0][2] + posb * keymat[1][2] + posc * keymat[2][2];
+        a = key.charAt(x % 26);
+        b = key.charAt(y % 26);
+        c = key.charAt(z % 26);
+        return "" + a + b + c;
+    }
+
+    private static String decode(char a, char b, char c) {
+        int x, y, z;
+        int posa = (int) a - 65;
+        int posb = (int) b - 65;
+        int posc = (int) c - 65;
+        x = posa * invkeymat[0][0] + posb * invkeymat[1][0] + posc * invkeymat[2][0];
+        y = posa * invkeymat[0][1] + posb * invkeymat[1][1] + posc * invkeymat[2][1];
+        z = posa * invkeymat[0][2] + posb * invkeymat[1][2] + posc * invkeymat[2][2];
+        a = key.charAt((x % 26 < 0) ? (26 + x % 26) : (x % 26));
+        b = key.charAt((y % 26 < 0) ? (26 + y % 26) : (y % 26));
+        c = key.charAt((z % 26 < 0) ? (26 + z % 26) : (z % 26));
+        return "" + a + b + c;
+    }
+
+    public static void main(String[] args) throws java.lang.Exception {
+        String msg, enc = "", dec = "";
+        int n;
+        msg = "SecurityLaboratory";
+        System.out.println("Simulating Hill Cipher\n-------------------------");
+        System.out.println("Input message : " + msg);
+        msg = msg.toUpperCase();
+        msg = msg.replaceAll("\\s", "");
+        n = msg.length() % 3;
+        if (n != 0) {
+            for (int i = 1; i <= (3 - n); i++) {
+                msg += 'X';
+            }
+        }
+        System.out.println("Padded message : " + msg);
+        char[] pdchars = msg.toCharArray();
+        for (int i = 0; i < msg.length(); i += 3) {
+            enc += encode(pdchars[i], pdchars[i + 1], pdchars[i + 2]);
+        }
+        System.out.println("Encrypted message : " + enc);
+        char[] dechars = enc.toCharArray();
+        for (int i = 0; i < enc.length(); i += 3) {
+            dec += decode(dechars[i], dechars[i + 1], dechars[i + 2]);
+        }
+        System.out.println("Decrypted message : " + dec);
+    }
+}
+VigenereCipher.java
+public class vigenereCipher {
+    static String encode(String text, final String key) {
+        String res = "";
+        text = text.toUpperCase();
+        for (int i = 0, j = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c < 'A' || c > 'Z') {
+                continue;
+            }
+            res += (char) ((c + key.charAt(j) - 2 * 'A') % 26 + 'A');
+            j = ++j % key.length();
+        }
+        return res;
+    }
+
+    static String decode(String text, final String key) {
+        String res = "";
+        text = text.toUpperCase();
+        for (int i = 0, j = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c < 'A' || c > 'Z') {
+                continue;
+            }
+            res += (char) ((c - key.charAt(j) + 26) % 26 + 'A');
+            j = ++j % key.length();
+        }
+        return res;
+    }
+
+    public static void main(String[] args) throws java.lang.Exception {
+        String key = "VIGENERECIPHER";
+        String msg = "SecurityLaboratory";
+        System.out.println("Simulating Vigenere Cipher\n------------------------");
+        System.out.println("Input Message : " + msg);
+        String enc = encode(msg, key);
+        System.out.println("Encrypted Message : " + enc);
+        System.out.println("Decrypted Message : " + decode(enc, key));
+    }
+}
+RailFenceCipher.java
+public class RailFenceCipher {
+    public static void main(String[] args) throws java.lang.Exception {
+        railfenceCipherHelper rf = new railfenceCipherHelper();
+        String msg, enc, dec;
+        msg = "Anna University, Chennai";
+        int depth = 2;
+        enc = rf.encode(msg, depth);
+        dec = rf.decode(enc, depth);
+        System.out.println("Simulating Railfence Cipher\n-------------------------");
+        System.out.println("Input Message : " + msg);
+        System.out.println("Encrypted Message : " + enc);
+        System.out.printf("Decrypted Message : " + dec);
+    }
+}
+
+class railfenceCipherHelper {
+    int depth;
+
+    String encode(String msg, int depth) throws Exception {
+        int r = depth;
+        int l = msg.length();
+        int c = (int) Math.ceil((double) l / depth);
+        int k = 0;
+        char[][] mat = new char[r][c];
+        String enc = "";
+        for (int i = 0; i < c; i++) {
+            for (int j = 0; j < r; j++) {
+                if (k != l) {
+                    mat[j][i] = msg.charAt(k++);
+                } else {
+                    mat[j][i] = 'X';
+                }
+            }
+        }
+        for (int i = 0; i < r; i++) {
+            for (int j = 0; j < c; j++) {
+                enc += mat[i][j];
+            }
+        }
+        return enc;
+    }
+
+    String decode(String encmsg, int depth) throws Exception {
+        int r = depth;
+        int l = encmsg.length();
+        int c = l / depth;
+        int k = 0;
+        char[][] mat = new char[r][c];
+        String dec = "";
+        for (int i = 0; i < r; i++) {
+            for (int j = 0; j < c; j++) {
+                mat[i][j] = encmsg.charAt(k++);
+            }
+        }
+        for (int i = 0; i < c; i++) {
+            for (int j = 0; j < r; j++) {
+                dec += mat[j][i];
+            }
+        }
+        return dec;
+    }
+}
+TransCipher.java
+import java.util.*;
+
+class TransCipher {
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        System.out.println("Enter the plain text");
+        String pl = sc.nextLine();
+        sc.close();
+        String s = "";
+        int start = 0;
+        for (int i = 0; i < pl.length(); i++) {
+            if (pl.charAt(i) == ' ') {
+                s = s + pl.substring(start, i);
+                start = i + 1;
+            }
+        }
+        s = s + pl.substring(start);
+        System.out.print(s);
+        System.out.println();
+        int k = s.length();
+        int l = 0;
+        int col = 4;
+        int row = (int) Math.ceil((double) s.length() / col);
+        char[][] ch = new char[row][col];
+        for (int i = 0; i < row; i++) {
+            for (int j = 0; j < col; j++) {
+                if (l < k) {
+                    ch[i][j] = s.charAt(l);
+                    l++;
+                } else {
+                    ch[i][j] = '#';
+                }
+            }
+        }
+        char[][] trans = new char[col][row];
+        for (int i = 0; i < row; i++) {
+            for (int j = 0; j < col; j++) {
+                trans[j][i] = ch[i][j];
+            }
+        }
+        for (int i = 0; i < col; i++) {
+            for (int j = 0; j < row; j++) {
+                System.out.print(trans[i][j]);
+            }
+        }
+        System.out.println();
+    }
+}
+DES.java
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.KeyGenerator;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
+
+public class DES {
+    public static void main(String[] argv) {
+        try {
+            System.out.println("Message Encryption Using DES Algorithm\n-------");
+            KeyGenerator keygenerator = KeyGenerator.getInstance("DES");
+            SecretKey myDesKey = keygenerator.generateKey();
+            Cipher desCipher;
+            desCipher = Cipher.getInstance("DES/ECB/PKCS5Padding");
+            desCipher.init(Cipher.ENCRYPT_MODE, myDesKey);
+            byte[] text = "Secret Information ".getBytes();
+            System.out.println("Message [Byte Format] : " + java.util.Arrays.toString(text));
+            System.out.println("Message : " + new String(text));
+            byte[] textEncrypted = desCipher.doFinal(text);
+            System.out.println("Encrypted Message: " + java.util.Arrays.toString(textEncrypted));
+            desCipher.init(Cipher.DECRYPT_MODE, myDesKey);
+            byte[] textDecrypted = desCipher.doFinal(textEncrypted);
+            System.out.println("Decrypted Message: " + new String(textDecrypted));
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (NoSuchPaddingException e) {
+            e.printStackTrace();
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        } catch (IllegalBlockSizeException e) {
+            e.printStackTrace();
+        } catch (BadPaddingException e) {
+            e.printStackTrace();
+        }
+    }
+}
+AES.java
+import java.io.UnsupportedEncodingException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
+import java.util.Base64;
+import javax.crypto.Cipher;
+import javax.crypto.spec.SecretKeySpec;
+
+public class AES {
+    private static SecretKeySpec secretKey;
+    private static byte[] key;
+
+    public static void setKey(String myKey) {
+        MessageDigest sha = null;
+        try {
+            key = myKey.getBytes("UTF-8");
+            sha = MessageDigest.getInstance("SHA-1");
+            key = sha.digest(key);
+            key = Arrays.copyOf(key, 16);
+            secretKey = new SecretKeySpec(key, "AES");
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static String encrypt(String strToEncrypt, String secret) {
+        try {
+            setKey(secret);
+            Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+            cipher.init(Cipher.ENCRYPT_MODE, secretKey);
+            return Base64.getEncoder().encodeToString(cipher.doFinal(strToEncrypt.getBytes("UTF-8")));
+        } catch (Exception e) {
+            System.out.println("Error while encrypting: " + e.toString());
+        }
+        return null;
+    }
+
+    public static String decrypt(String strToDecrypt, String secret) {
+        try {
+            setKey(secret);
+            Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5PADDING");
+            cipher.init(Cipher.DECRYPT_MODE, secretKey);
+            return new String(cipher.doFinal(Base64.getDecoder().decode(strToDecrypt)));
+        } catch (Exception e) {
+            System.out.println("Error while decrypting: " + e.toString());
+        }
+        return null;
+    }
+
+    public static void main(String[] args) {
+        final String secretKey = "annaUniversity";
+        String originalString = "www.annauniv.edu";
+        String encryptedString = AES.encrypt(originalString, secretKey);
+        String decryptedString = AES.decrypt(encryptedString, secretKey);
+        System.out.println("URL Encryption Using AES Algorithm\n------------");
+        System.out.println("Original URL : " + originalString);
+        System.out.println("Encrypted URL : " + encryptedString);
+        System.out.println("Decrypted URL : " + decryptedString);
+    }
+}
+rsa.html
+<html>
+<head>
+    <title>RSA Encryption</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+    <center>
+        <h1>RSA Algorithm</h1>
+        <h2>Implemented Using HTML & Javascript</h2>
+        <hr>
+        <table>
+            <tr>
+                <td>Enter First Prime Number:</td>
+                <td><input type="number" value="53" id="p"></td>
+            </tr>
+            <tr>
+                <td>Enter Second Prime Number:</td>
+                <td><input type="number" value="59" id="q"></td>
+            </tr>
+            <tr>
+                <td>Enter the Message(cipher text):<br>[A=1, B=2,...]</td>
+                <td><input type="number" value="89" id="msg"></td>
+            </tr>
+            <tr>
+                <td>Public Key:</td>
+                <td><p id="publickey"></p></td>
+            </tr>
+            <tr>
+                <td>Exponent:</td>
+                <td><p id="exponent"></p></td>
+            </tr>
+            <tr>
+                <td>Private Key:</td>
+                <td><p id="privatekey"></p></td>
+            </tr>
+            <tr>
+                <td>Cipher Text:</td>
+                <td><p id="ciphertext"></p></td>
+            </tr>
+            <tr>
+                <td>Decrypted Text:</td>
+                <td><p id="plaintext"></p></td>
+            </tr>
+            <tr>
+                <td><button onclick="RSA();">Apply RSA</button></td>
+            </tr>
+        </table>
+    </center>
+</body>
+<script type="text/javascript">
+    // Modular exponentiation done with BigInt so it stays exact even
+    // for large exponents (Math.pow() on numbers overflows and was
+    // producing NaN / Infinity in the original version).
+    function modPow(base, exp, mod) {
+        base = BigInt(base);
+        exp = BigInt(exp);
+        mod = BigInt(mod);
+        let result = 1n;
+        base = base % mod;
+        while (exp > 0n) {
+            if (exp % 2n === 1n) {
+                result = (result * base) % mod;
+            }
+            exp = exp / 2n;
+            base = (base * base) % mod;
+        }
+        return result;
+    }
+
+    function gcd(a, b) {
+        return (!b) ? a : gcd(b, a % b);
+    }
+
+    function RSA() {
+        var p, q, no, n, t, e, i, x, d;
+        p = Number(document.getElementById('p').value);
+        q = Number(document.getElementById('q').value);
+        no = Number(document.getElementById('msg').value);
+        n = p * q;
+        t = (p - 1) * (q - 1);
+
+        for (e = 2; e < t; e++) {
+            if (gcd(e, t) == 1) {
+                break;
+            }
+        }
+
+        d = null;
+        for (i = 1; i <= t; i++) {
+            x = 1 + i * t;
+            if (x % e == 0) {
+                d = x / e;
+                break;
+            }
+        }
+
+        var ct = modPow(no, e, n);
+        var dt = modPow(ct, d, n);
+
+        document.getElementById('publickey').innerHTML = n;
+        document.getElementById('exponent').innerHTML = e;
+        document.getElementById('privatekey').innerHTML = d;
+        document.getElementById('ciphertext').innerHTML = ct.toString();
+        document.getElementById('plaintext').innerHTML = dt.toString();
+    }
+</script>
+</html>
+DiffieHellman.java
+class DiffieHellman {
+    public static void main(String[] args) {
+        int p = 23;
+        int g = 5;
+        int x = 4;
+        int y = 3;
+        double aliceSends = (Math.pow(g, x)) % p;
+        double bobComputes = (Math.pow(aliceSends, y)) % p;
+        double bobSends = (Math.pow(g, y)) % p;
+        double aliceComputes = (Math.pow(bobSends, x)) % p;
+        double sharedSecret = (Math.pow(g, (x * y))) % p;
+        System.out.println("Simulation of Diffie-Hellman key exchange algorithm\n---------------------------------------------");
+        System.out.println("Alice Sends : " + aliceSends);
+        System.out.println("Bob Computes : " + bobComputes);
+        System.out.println("Bob Sends : " + bobSends);
+        System.out.println("Alice Computes : " + aliceComputes);
+        System.out.println("Shared Secret : " + sharedSecret);
+        if ((aliceComputes == sharedSecret) && (aliceComputes == bobComputes))
+            System.out.println("Success: Shared Secrets Matches! " + sharedSecret);
+        else
+            System.out.println("Error: Shared Secrets does not Match");
+    }
+}
+sha1.java
+import java.security.*;
+
+public class sha1 {
+    public static void main(String[] a) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA1");
+            System.out.println("Message digest object info:\n-----------------");
+            System.out.println("Algorithm=" + md.getAlgorithm());
+            System.out.println("Provider=" + md.getProvider());
+            System.out.println("ToString=" + md.toString());
+            String input = "";
+            md.update(input.getBytes());
+            byte[] output = md.digest();
+            System.out.println();
+            System.out.println("SHA1(\"" + input + "\")=" + bytesToHex(output));
+            input = "abc";
+            md.update(input.getBytes());
+            output = md.digest();
+            System.out.println();
+            System.out.println("SHA1(\"" + input + "\")=" + bytesToHex(output));
+            input = "abcdefghijklmnopqrstuvwxyz";
+            md.update(input.getBytes());
+            output = md.digest();
+            System.out.println();
+            System.out.println("SHA1(\"" + input + "\")=" + bytesToHex(output));
+            System.out.println();
+        } catch (Exception e) {
+            System.out.println("Exception:" + e);
+        }
+    }
+
+    private static String bytesToHex(byte[] b) {
+        char[] hexDigit = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+        StringBuffer buf = new StringBuffer();
+        for (byte aB : b) {
+            buf.append(hexDigit[(aB >> 4) & 0x0f]);
+            buf.append(hexDigit[aB & 0x0f]);
+        }
+        return buf.toString();
+    }
+}
+CreatingDigitalSignature.java
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.PrivateKey;
+import java.security.Signature;
+import java.util.Scanner;
+
+public class CreatingDigitalSignature {
+    public static void main(String[] args) throws Exception {
+        Scanner sc = new Scanner(System.in);
+        System.out.println("Enter some text");
+        String msg = sc.nextLine();
+        sc.close();
+
+        KeyPairGenerator keyPairGen = KeyPairGenerator.getInstance("DSA");
+        keyPairGen.initialize(2048);
+        KeyPair pair = keyPairGen.generateKeyPair();
+
+        PrivateKey privKey = pair.getPrivate();
+
+        Signature sign = Signature.getInstance("SHA256withDSA");
+        sign.initSign(privKey);
+        byte[] bytes = msg.getBytes();
+        sign.update(bytes);
+
+        byte[] signature = sign.sign();
+
+        System.out.println("Digital signature for given text: " + java.util.Base64.getEncoder().encodeToString(signature));
+    }
+}
+Trojan.bat
+@echo off
+:x
+start mspaint
+start notepad
+start cmd
+start explorer
+start control
+start calc
+goto x
+
